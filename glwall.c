@@ -45,6 +45,20 @@ GLuint create_shader(const char *filename, GLenum type)
     shader = glCreateShader(type);
     glShaderSource(shader, 1, &shader_code, 0);
     glCompileShader(shader);
+
+		GLint status;
+		glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+		if (status == GL_FALSE) {
+			GLint len;
+			glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
+
+			GLchar* errorLog = malloc(len);
+			glGetShaderInfoLog(shader, len, &len, errorLog);
+
+			fprintf(stderr, "Shader compilation failed %s (%u):\n%s\n", filename, shader, errorLog);
+			free(errorLog);
+		}
+
     return shader;
 }
 
@@ -58,6 +72,20 @@ GLuint create_program(const char *vert_shader, const char *frag_shader)
     glAttachShader(prog, frag);
     glBindAttribLocation(prog, 0, "position");
     glLinkProgram(prog);
+
+		GLint status;
+		glGetProgramiv(prog, GL_LINK_STATUS, &status);
+		if (status == GL_FALSE) {
+			GLint len;
+			glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
+
+			GLchar* errorLog = malloc(len);
+			glGetProgramInfoLog(prog, len, &len, errorLog);
+
+			fprintf(stderr, "Linking the program failed %u:\n%s\n", prog, errorLog);
+			free(errorLog);
+		}
+
     timeLocation = glGetUniformLocation(prog, "time");
     resolutionLocation = glGetUniformLocation(prog, "resolution");
     mouseLocation = glGetUniformLocation(prog, "mouse");
@@ -130,6 +158,7 @@ void setup_x11()
 {
     Window window = glfwGetX11Window(glfwWindow);
     Display* display = glfwGetX11Display();
+		XUnmapWindow(display, window);
 
     // setup window states
     Atom wmState = XInternAtom(display,"_NET_WM_STATE",False);
@@ -163,6 +192,7 @@ void setup_x11()
     hints.input = False;
     hints.initial_state = 1;
     XSetWMHints(display, window, &hints);
+		XMapWindow(display, window);
 }
 
 int main()

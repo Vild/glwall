@@ -1,55 +1,99 @@
-uniform float time; 
-uniform vec2 mouse; 
-uniform vec2 resolution; 
-uniform sampler2D tex; 
- 
-void main( void ) 
-{ 
-    vec2 p = gl_FragCoord.xy / resolution.xy * 2.0 - 0.5; 
-     
-    vec2 uPos = ( gl_FragCoord.xy / resolution.xy );//normalize wrt y axis 
-    uPos *= 3.0; 
-    uPos = abs(uPos); 
-    uPos -= vec2((resolution.x/resolution.y)/1.05, 0.0);//shift origin to center 
-    //uPos.x -= 1.5; 
-    uPos.y -= 2.0; 
-     
-    vec3 color = vec3(0.0); 
-    float vertColor = 0.0; 
-    for( float i = 0.0; i < 10.0; ++i ) 
-    { 
-        float t = time * (1.5); 
-     
-        uPos.y += sin( uPos.x*(i+5.0) + t+i/5.0 ) * 0.1; 
-        float fTemp = abs(2.4 / uPos.y / 180.0); 
-        vertColor += fTemp; 
-        color += vec3( fTemp, fTemp*i/15.0, pow(fTemp,0.99)*3.0 ); 
-    } 
-     
-    vec4 color_final = vec4(color, 0); 
-    
-    /*
-    vec2 uv = gl_FragCoord.xy / resolution.xy; 
-    vec4 s = vec4(0.0); 
-    float o = 0.1; 
-    s += texture2D(tex, uv + vec2( -o, -o)); 
-    s += texture2D(tex, uv + vec2(10.0, -o)); 
-    s += texture2D(tex, uv + vec2(  o, -o)); 
-    s += texture2D(tex, uv + vec2( -o, 10.0)); 
-    s += texture2D(tex, uv + vec2(10.0, 10.0)); 
-    s += texture2D(tex, uv + vec2(  o, 10.0)); 
-    s += texture2D(tex, uv + vec2( -o,  o)); 
-    s += texture2D(tex, uv + vec2(10.0,  o)); 
-    s += texture2D(tex, uv + vec2(  o,  o)); 
-    s /= 90.0; 
-          */
-    vec4 s = vec4(0.0); 
-    color_final = mix(color_final, s, sin(p.x*p.y/ + time*8.0) * 0.15 + 0.75 );     
+#version 330 core
+uniform float time;
+uniform vec2 mouse;
+uniform vec2 resolution;
+uniform sampler2D tex;
 
-    float avg = color_final.r + color_final.g * color_final.b; 
-    avg /= 1.0; 
-    color_final = vec4(avg, avg, color_final.b, avg); 
-     
-    gl_FragColor = color_final; 
- 
+out vec4 fragColor;
+
+// By Dan Printzell <github vild io>
+// License: MPLv2
+
+#define PATTERN_COLOR 0
+#define PATTERN_GRAY 1
+
+#define PATTERN PATTERN_COLOR
+
+const float d = 8.0;
+#if PATTERN == PATTERN_COLOR
+const vec4 offsetMove = vec4(4, 2, 32, 0);
+const float hasStarRatio = 0.78;
+const float blinkRatio   = 0.88;
+#else
+const vec4 offsetMove = vec4(4, 2, 16, 0);
+const float hasStarRatio = 0;
+const float blinkRatio   = 0.8;
+#endif
+const float blinkSpeed   = 0.9;
+vec2 offset;
+float x;
+float y;
+float rx;
+float ry;
+float randRes;
+
+vec2 seed;
+
+float rand();
+
+float hasStar() {
+	if (randRes > hasStarRatio) {
+		float cx = rx * d;
+		float cy = ry * d;
+
+		float r = sqrt(pow(x - cx, 2.0) + pow(y - cy, 2.0));
+		return 1.0 - ((r * 2.0) / d);
+	}
+	return 0.0;
+}
+
+vec4 starColor() {
+#if PATTERN == PATTERN_COLOR
+	return vec4(
+		abs(mod(y - x, 255.0)) / 255.0,
+		abs(mod(x + y, 255.0)) / 255.0,
+		abs(mod(x - y, 255.0)) / 255.0,
+		1.0
+	) * 1.5;
+#else
+	return vec4(
+							rand(),
+							rand(),
+							rand(),
+							1.0
+	);
+#endif
+}
+
+float blink() {
+	if (randRes > blinkRatio)
+		return sin(randRes/3.0+(offset.x+offset.y+gl_FragCoord.x)*blinkSpeed/d)/2.0 + 0.5;
+	return 1.0;
+}
+
+void main() {
+	offset = vec2(time * offsetMove.x + sin(time * offsetMove.y), time * offsetMove.z + sin(time * offsetMove.w));
+	x = floor(offset.x + gl_FragCoord.x + 0.5);
+	y = floor(offset.y + gl_FragCoord.y + 0.5);
+	rx = floor(x / d + 0.5);
+	ry = floor(y / d + 0.5);
+	seed = vec2(rx, ry);
+	randRes = rand();
+	vec4 result = starColor() * hasStar() * blink();
+	fragColor = result;
+}
+
+float PHI = 1.61803398874989484820459 * 00000.1; // Golden Ratio
+float PI  = 3.14159265358979323846264 * 00000.1; // PI
+float SRT = 1.41421356237309504880169 * 10000.0; // Square Root of Two
+
+
+// Gold Noise function
+//
+float gold_noise(in vec2 coordinate, in float seed) {
+	return fract(sin(dot(coordinate*seed, vec2(PHI, PI)))*SRT);
+}
+
+float rand() {
+	return gold_noise(seed, 13.37) * gold_noise(seed, 73.31);
 }
